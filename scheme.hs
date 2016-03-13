@@ -142,24 +142,28 @@ parseQuoted = do
     return $ List [Atom "quote", x]
 
 parseList :: Parser LispVal
-parseList = List <$> parseExpr `sepEndBy` spaces
+parseList = optional spaces >> List <$> many parseExpr
 
 parseDottedList :: Parser LispVal
 parseDottedList = do
-    head <- parseExpr `endBy` spaces
+    head <- optional spaces >> many parseExpr
     tail <- char '.' >> spaces >> parseExpr
     optional spaces
     return $ DottedList head tail
 
 parseExpr :: Parser LispVal
 parseExpr = do
+    x <- (parseChar
+         <|> parseString
+         <|> parseNumber
+         <|> parseQuoted
+         <|> parseAtom
+         <|> between (char '(') (char ')') (try parseDottedList <|> parseList))
     optional spaces
-    parseChar
-     <|> parseString
-     <|> parseNumber
-     <|> parseQuoted
-     <|> parseAtom
-     <|> between (char '(') (char ')') (try parseDottedList <|> parseList)
+    return x
+
+parseRepl :: Parser LispVal
+parseRepl = optional spaces >> parseExpr
 
 readOrThrow :: Parser a -> String -> ThrowsError a
 readOrThrow parser input = case parse parser "lisp" input of
@@ -467,7 +471,20 @@ flushStr :: String -> IO ()
 flushStr str = putStr str >> hFlush stdout
 
 readPrompt :: String -> IO String
-readPrompt prompt = flushStr prompt >> getLine
+readPrompt prompt = flushStr prompt >> getLine >>= return . strip
+
+strip :: String -> String
+strip = lstrip . rstrip
+
+lstrip :: String -> String
+lstrip str = case str of
+               [] -> []
+               (x:xs) -> if elem x " \t" then lstrip xs else str
+
+-- This double-reverse isn't great but stripping whitespace here is a hack
+-- to begin with
+rstrip :: String -> String
+rstrip = reverse . lstrip . reverse
 
 evalString :: Env -> String -> IO String
 evalString env expr = runIOThrows $ fmap show $ (liftThrows $ readExpr expr) >>= eval env
