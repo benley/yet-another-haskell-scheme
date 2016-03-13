@@ -57,3 +57,5 @@
 (define (map func xs)        (foldr (lambda (x y) (cons (func x) y)) '() xs))
 
 (define (filter pred xs)     (foldr (lambda (x y) (if (pred x) (cons x y) y)) '() xs))
+
+(define (find pred xs)       (car (filter pred xs)))
