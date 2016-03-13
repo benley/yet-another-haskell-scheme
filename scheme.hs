@@ -6,7 +6,7 @@ module Scheme where
 import Control.Monad
 import Control.Monad.Except
 import Data.IORef
-import Data.Maybe
+import Data.Maybe (isJust, isNothing)
 import System.Environment
 import System.IO
 import Text.ParserCombinators.Parsec hiding (spaces)
@@ -142,21 +142,24 @@ parseQuoted = do
     return $ List [Atom "quote", x]
 
 parseList :: Parser LispVal
-parseList = List <$> parseExpr `sepBy` spaces
+parseList = List <$> parseExpr `sepEndBy` spaces
 
 parseDottedList :: Parser LispVal
 parseDottedList = do
     head <- parseExpr `endBy` spaces
     tail <- char '.' >> spaces >> parseExpr
+    optional spaces
     return $ DottedList head tail
 
 parseExpr :: Parser LispVal
-parseExpr = parseChar
-            <|> parseString
-            <|> parseNumber
-            <|> parseQuoted
-            <|> parseAtom
-            <|> between (char '(') (char ')') (try parseList <|> parseDottedList)
+parseExpr = do
+    optional spaces
+    parseChar
+     <|> parseString
+     <|> parseNumber
+     <|> parseQuoted
+     <|> parseAtom
+     <|> between (char '(') (char ')') (try parseDottedList <|> parseList)
 
 readOrThrow :: Parser a -> String -> ThrowsError a
 readOrThrow parser input = case parse parser "lisp" input of
@@ -263,6 +266,8 @@ apply (Func params varargs body closure) args =
                 Nothing -> return env
 
 apply (IOFunc func) args = func args
+
+apply badArg _ = throwError $ TypeMismatch "function" $ badArg
 
 
 ioPrimitives :: [(String, [LispVal] -> IOThrowsError LispVal)]
