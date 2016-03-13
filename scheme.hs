@@ -170,15 +170,15 @@ readExprList = readOrThrow (endBy parseExpr spaces)
 
 
 showVal :: LispVal -> String
-showVal (String contents) = "\"" ++ contents ++ "\""
-showVal (Atom name) = name
-showVal (Number contents) = show contents
-showVal (Bool True) = "#t"
-showVal (Bool False) = "#f"
-showVal (List contents) = "(" ++ unwordsList contents ++ ")"
+showVal (String contents)      = "\"" ++ contents ++ "\""
+showVal (Atom name)            = name
+showVal (Number contents)      = show contents
+showVal (Bool True)            = "#t"
+showVal (Bool False)           = "#f"
+showVal (List contents)        = "(" ++ unwordsList contents ++ ")"
 showVal (DottedList head tail) = "(" ++ unwordsList head ++ " . " ++ showVal tail ++ ")"
-showVal (Character c) = "#\\" ++ [c]
-showVal (PrimitiveFunc _) = "<primitive>"
+showVal (Character c)          = "#\\" ++ [c]
+showVal (PrimitiveFunc _)      = "<primitive>"
 showVal Func {params = args, vararg = varargs, body = body, closure = env} =
     "(lambda ("
      ++ unwords (map show args)
