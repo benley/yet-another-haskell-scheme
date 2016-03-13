@@ -58,4 +58,6 @@
 
 (define (filter pred xs)     (foldr (lambda (x y) (if (pred x) (cons x y) y)) '() xs))
 
-(define (find pred xs)       (car (filter pred xs)))
+(define (find pred xs)
+  (define res (filter pred xs))
+  (if (null? res) #f (car res)))
