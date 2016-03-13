@@ -111,7 +111,7 @@ binaryRadixNumber = do
 
 bin2dec :: String -> Integer
 bin2dec = foldr (\c s -> s * 2 + c) 0 . reverse . map c2i
-          where c2i c = if c=='0' then 0 else 1
+          where c2i c = if c == '0' then 0 else 1
 
 decimalNumber :: Parser LispVal
 decimalNumber = (Number . read) <$> many1 digit
@@ -130,10 +130,6 @@ octalRadixNumber = do
     return $ Number $ read $ "0o" ++ num
 
 parseNumber :: Parser LispVal
--- Equivalent functions:
--- parseNumber = many1 digit >>= return . Number . read
--- parseNumber = liftM (Number . read) $ many1 digit
--- parseNumber = (Number . read) <$> many1 digit
 parseNumber = decimalNumber
               <|> decimalRadixNumber
               <|> binaryRadixNumber
@@ -171,6 +167,7 @@ readExpr :: String -> ThrowsError LispVal
 readExpr = readOrThrow parseExpr
 
 readExprList = readOrThrow (endBy parseExpr spaces)
+
 
 showVal :: LispVal -> String
 showVal (String contents) = "\"" ++ contents ++ "\""
@@ -485,7 +482,9 @@ runOne args = do
         >>= hPutStrLn stderr
 
 runRepl :: IO ()
-runRepl = primitiveBindings >>= until_ (== "quit") (readPrompt "Lisp >>> ") . evalAndPrint
+runRepl = primitiveBindings >>=
+    until_ (flip elem $ ["quit", "(quit)"])
+           (readPrompt "Lisp >>> ") . evalAndPrint
 
 makeFunc varargs env params body = return $ Func (map showVal params) varargs body env
 makeNormalFunc = makeFunc Nothing
