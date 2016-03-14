@@ -185,13 +185,12 @@ showVal (DottedList head tail) = "(" ++ unwordsList head ++ " . " ++ showVal tai
 showVal (Character c)          = "#\\" ++ [c]
 showVal (PrimitiveFunc _)      = "<primitive>"
 showVal Func {params = args, vararg = varargs, body = body, closure = env} =
-    "(lambda ("
-     ++ unwords (map show args)
-     ++ (case varargs of
-              Nothing -> ""
-              Just arg -> " . "  ++ arg)
-     ++ ") " ++ (unwords (showVal <$> body)) ++ ")"
-showVal (Port _) = "<IO port>"
+              "(lambda (" ++ unwords (map show args)
+                          ++ (case varargs of
+                                   Nothing  -> ""
+                                   Just arg -> " . "  ++ arg) ++ ") "
+                          ++ (unwords (showVal <$> body)) ++ ")"
+showVal (Port _)   = "<IO port>"
 showVal (IOFunc _) = "<IO primitive>"
 
 
@@ -359,20 +358,20 @@ isSymbol _ = return $ Bool False
 
 isString :: [LispVal] -> ThrowsError LispVal
 isString [String _] = return $ Bool True
-isString _ = return $ Bool False
+isString _          = return $ Bool False
 
 isNumber :: [LispVal] -> ThrowsError LispVal
 isNumber [Number _] = return $ Bool True
-isNumber _ = return $ Bool False
+isNumber _          = return $ Bool False
 
 isChar :: [LispVal] -> ThrowsError LispVal
 isChar [Character _] = return $ Bool True
-isChar _ = return $ Bool False
+isChar _             = return $ Bool False
 
 numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> ThrowsError LispVal
-numericBinop op [] = throwError $ NumArgs 2 []
+numericBinop op []            = throwError $ NumArgs 2 []
 numericBinop op singleVal@[_] = throwError $ NumArgs 2 singleVal
-numericBinop op params = mapM unpackNum params >>= return . Number . foldl1 op
+numericBinop op params        = mapM unpackNum params >>= return . Number . foldl1 op
 
 unpackNum :: LispVal -> ThrowsError Integer
 unpackNum (Number n) =  return n
@@ -381,7 +380,7 @@ unpackNum (String n) = let parsed = reads n :: [(Integer, String)] in
                               then throwError $ TypeMismatch "number" $ String n
                               else return $ fst $ parsed !! 0
 unpackNum (List [n]) = unpackNum n
-unpackNum notNum = throwError $ TypeMismatch "number" notNum
+unpackNum notNum     = throwError $ TypeMismatch "number" notNum
 
 boolBinop :: (LispVal -> ThrowsError a) -> (a -> a -> Bool) -> [LispVal] -> ThrowsError LispVal
 boolBinop unpacker op args = if length args /= 2
@@ -418,11 +417,11 @@ cdr [badArg]                = throwError $ TypeMismatch "pair" badArg
 cdr badArgList              = throwError $ NumArgs 1 badArgList
 
 cons :: [LispVal] -> ThrowsError LispVal
-cons [x1, List []] = return $ List [x1]
-cons [x, List xs] = return $ List (x : xs)
-cons [x, DottedList xs xlast] = return $ DottedList (x : xs) xlast
-cons [x1, x2] = return $ DottedList [x1] x2
-cons badArgList = throwError $ NumArgs 2 badArgList
+cons [x1, List []]             = return $ List [x1]
+cons [x,  List xs]             = return $ List (x : xs)
+cons [x,  DottedList xs xlast] = return $ DottedList (x : xs) xlast
+cons [x1, x2]                  = return $ DottedList [x1] x2
+cons badArgList                = throwError $ NumArgs 2 badArgList
 
 
 eqv :: [LispVal] -> ThrowsError LispVal
@@ -435,7 +434,7 @@ eqv [(DottedList xs x), (DottedList ys y)] = eqv [List $ xs ++ [x], List $ ys ++
 eqv [(List arg1), (List arg2)] =
     return $ Bool $ (length arg1 == length arg2) && (all eqvPair $ zip arg1 arg2)
     where eqvPair (x1, x2) = case eqv [x1, x2] of
-                               Left err -> False
+                               Left  err -> False
                                Right (Bool val) -> val
 
 eqv [_, _]     = return $ Bool False
