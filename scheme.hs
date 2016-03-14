@@ -162,9 +162,6 @@ parseExpr = do
     optional spaces
     return x
 
-parseRepl :: Parser LispVal
-parseRepl = optional spaces >> parseExpr
-
 readOrThrow :: Parser a -> String -> ThrowsError a
 readOrThrow parser input = case parse parser "lisp" input of
                              Left  err -> throwError $ Parser err
@@ -173,7 +170,8 @@ readOrThrow parser input = case parse parser "lisp" input of
 readExpr :: String -> ThrowsError LispVal
 readExpr = readOrThrow parseExpr
 
-readExprList = readOrThrow (endBy parseExpr spaces)
+readExprList :: String -> ThrowsError [LispVal]
+readExprList = readOrThrow (many parseExpr)
 
 
 showVal :: LispVal -> String
@@ -192,7 +190,7 @@ showVal Func {params = args, vararg = varargs, body = body, closure = env} =
      ++ (case varargs of
               Nothing -> ""
               Just arg -> " . "  ++ arg)
-     ++ ") ...)"
+     ++ ") " ++ (unwords (showVal <$> body)) ++ ")"
 showVal (Port _) = "<IO port>"
 showVal (IOFunc _) = "<IO primitive>"
 
