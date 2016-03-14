@@ -74,28 +74,26 @@ escapedChar = do
     char '\\'
     x <- oneOf "nrt\\\""
     return $ case x of
-               'n' -> '\n'
-               'r' -> '\r'
-               't' -> '\t'
+               'n'  -> '\n'
+               'r'  -> '\r'
+               't'  -> '\t'
                '\\' -> '\\'
-               '"' -> '"'
+               '"'  -> '"'
 
 namedCharacter :: Parser Char
 namedCharacter = do
     x <- string "space" <|> string "newline"
     return $ case x of
-               "space" -> ' '
+               "space"   -> ' '
                "newline" -> '\n'
 
 parseChar :: Parser LispVal
-parseChar = do
-    x <- try (string "#\\" >> (namedCharacter <|> anyChar))
-    return $ Character x
+parseChar = try (string "#\\" >> (namedCharacter <|> anyChar)) >>= return . Character
 
 parseAtom :: Parser LispVal
 parseAtom = do
     first <- letter <|> symbol
-    rest <- many (letter <|> digit <|> symbol)
+    rest  <- many (letter <|> digit <|> symbol)
     let atom = first:rest
     return $ case atom of
                "#t" -> Bool True
@@ -105,6 +103,7 @@ parseAtom = do
 binaryRadixNumber :: Parser LispVal
 binaryRadixNumber = do
     num <- try (string "#b" >> many1 (oneOf "01"))
+    notFollowedBy digit
     return $ Number (bin2dec num)
 
 bin2dec :: String -> Integer
@@ -120,11 +119,13 @@ decimalRadixNumber = try (string "#d" >> decimalNumber)
 hexRadixNumber :: Parser LispVal
 hexRadixNumber = do
     num <- try (string "#x" >> many1 hexDigit)
+    notFollowedBy letter
     return $ Number $ read $ "0x" ++ num
 
 octalRadixNumber :: Parser LispVal
 octalRadixNumber = do
     num <- try (string "#o" >> (many1 $ octDigit))
+    notFollowedBy digit
     return $ Number $ read $ "0o" ++ num
 
 parseNumber :: Parser LispVal

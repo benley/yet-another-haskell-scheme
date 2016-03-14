@@ -61,3 +61,5 @@
 (define (find pred xs)
   (define res (filter pred xs))
   (if (null? res) #f (car res)))
+
+'()
