@@ -31,11 +31,6 @@ showError (TypeMismatch expected found) = "Invalid type: expected " ++ expected
 
 instance Show LispError where show = showError
 
------- I think this is no longer needed with Control.Monad.Except
--- instance Error LispError where
---      noMsg = Default "An error has occurred"
---      strMsg = Default
-
 type ThrowsError = Either LispError
 
 trapError action = catchError action (return . show)
@@ -43,18 +38,21 @@ trapError action = catchError action (return . show)
 extractValue :: ThrowsError a -> a
 extractValue (Right val) = val
 
-data LispVal = Atom String
-             | List [LispVal]
-             | DottedList [LispVal] LispVal
-             | Number Integer
-             | String String
-             | Bool Bool
-             | Character Char
+data LispVal = Atom          String
+             | List          [LispVal]
+             | DottedList    [LispVal] LispVal
+             | Number        Integer
+             | String        String
+             | Bool          Bool
+             | Character     Char
              | PrimitiveFunc ([LispVal] -> ThrowsError LispVal)
-             | Func { params :: [String], vararg :: (Maybe String),
-                      body :: [LispVal], closure :: Env }
-             | IOFunc ([LispVal] -> IOThrowsError LispVal)
-             | Port Handle
+             | IOFunc        ([LispVal] -> IOThrowsError LispVal)
+             | Port          Handle
+             | Func          { params  :: [String]
+                             , vararg  :: (Maybe String)
+                             , body    :: [LispVal]
+                             , closure :: Env
+                             }
 
 instance Show LispVal where show = showVal
 
