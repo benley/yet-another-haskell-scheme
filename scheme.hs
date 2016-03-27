@@ -331,41 +331,41 @@ readAll :: [LispVal] -> IOThrowsError LispVal
 readAll [String filename] = fmap List $ load filename
 
 primitives :: [(String, [LispVal] -> ThrowsError LispVal)]
-primitives = [ ("+", numericBinop (+))
-             , ("-", primSubtract)
-             , ("*", numericBinop (*))
-             , ("/", numericBinop div)
-             , ("mod", numericBinop mod)
-             , ("quotient", numericBinop quot)
+primitives = [ ("+",         numericBinop (+))
+             , ("-",         primSubtract)
+             , ("*",         numericBinop (*))
+             , ("/",         numericBinop div)
+             , ("mod",       numericBinop mod)
+             , ("quotient",  numericBinop quot)
              , ("remainder", numericBinop rem)
-             , ("symbol?", isSymbol)
-             , ("string?", isString)
-             , ("number?", isNumber)
-             , ("char?", isChar)
-             , ("=", numBoolBinop (==))
-             , ("<", numBoolBinop (<))
-             , (">", numBoolBinop (>))
-             , ("/=", numBoolBinop (/=))
-             , (">=", numBoolBinop (>=))
-             , ("<=", numBoolBinop (<=))
-             , ("&&", boolBoolBinop (&&))
-             , ("||", boolBoolBinop (||))
-             , ("string=?", strBoolBinop (==))
-             , ("string<?", strBoolBinop (<))
-             , ("string>?", strBoolBinop (>))
+             , ("symbol?",   isSymbol)
+             , ("string?",   isString)
+             , ("number?",   isNumber)
+             , ("char?",     isChar)
+             , ("=",         numBoolBinop (==))
+             , ("<",         numBoolBinop (<))
+             , (">",         numBoolBinop (>))
+             , ("/=",        numBoolBinop (/=))
+             , (">=",        numBoolBinop (>=))
+             , ("<=",        numBoolBinop (<=))
+             , ("&&",        boolBoolBinop (&&))
+             , ("||",        boolBoolBinop (||))
+             , ("string=?",  strBoolBinop (==))
+             , ("string<?",  strBoolBinop (<))
+             , ("string>?",  strBoolBinop (>))
              , ("string<=?", strBoolBinop (<=))
              , ("string>=?", strBoolBinop (>=))
-             , ("car", car)
-             , ("cdr", cdr)
-             , ("cons", cons)
-             , ("eqv?", eqv)
-             , ("eq?", eqv)
-             , ("equal?", equal)
+             , ("car",       car)
+             , ("cdr",       cdr)
+             , ("cons",      cons)
+             , ("eqv?",      eqv)
+             , ("eq?",       eqv)
+             , ("equal?",    equal)
              ]
 
 isSymbol :: [LispVal] -> ThrowsError LispVal
 isSymbol [Atom _] = return $ Bool True
-isSymbol _ = return $ Bool False
+isSymbol _        = return $ Bool False
 
 isString :: [LispVal] -> ThrowsError LispVal
 isString [String _] = return $ Bool True
@@ -441,10 +441,10 @@ cons badArgList                = throwError $ NumArgs 2 badArgList
 
 
 eqv :: [LispVal] -> ThrowsError LispVal
-eqv [(Bool arg1), (Bool arg2)]             = return $ Bool $ arg1 == arg2
-eqv [(Number arg1), (Number arg2)]         = return $ Bool $ arg1 == arg2
-eqv [(String arg1), (String arg2)]         = return $ Bool $ arg1 == arg2
-eqv [(Atom arg1), (Atom arg2)]             = return $ Bool $ arg1 == arg2
+eqv [(Bool arg1),       (Bool arg2)]       = return $ Bool $ arg1 == arg2
+eqv [(Number arg1),     (Number arg2)]     = return $ Bool $ arg1 == arg2
+eqv [(String arg1),     (String arg2)]     = return $ Bool $ arg1 == arg2
+eqv [(Atom arg1),       (Atom arg2)]       = return $ Bool $ arg1 == arg2
 eqv [(DottedList xs x), (DottedList ys y)] = eqv [List $ xs ++ [x], List $ ys ++ [y]]
 
 eqv [(List arg1), (List arg2)] =
@@ -521,7 +521,7 @@ nullEnv = newIORef[]
 type IOThrowsError = ExceptT LispError IO
 
 liftThrows :: ThrowsError a -> IOThrowsError a
-liftThrows (Left err) = throwError err
+liftThrows (Left  err) = throwError err
 liftThrows (Right val) = return val
 
 runIOThrows :: IOThrowsError String -> IO String
