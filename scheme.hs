@@ -190,14 +190,14 @@ showVal (List contents)        = "(" ++ unwordsList contents ++ ")"
 showVal (DottedList head tail) = "(" ++ unwordsList head ++ " . " ++ showVal tail ++ ")"
 showVal (Character c)          = "#\\" ++ [c]
 showVal (PrimitiveFunc _)      = "<primitive>"
+showVal (Port _)               = "<IO port>"
+showVal (IOFunc _)             = "<IO primitive>"
 showVal Func {params = args, vararg = varargs, body = body, closure = env} =
               "(lambda (" ++ unwords (map show args)
                           ++ (case varargs of
                                    Nothing  -> ""
                                    Just arg -> " . "  ++ arg) ++ ") "
                           ++ (unwords (showVal <$> body)) ++ ")"
-showVal (Port _)   = "<IO port>"
-showVal (IOFunc _) = "<IO primitive>"
 
 
 unwordsList :: [LispVal] -> String
@@ -478,11 +478,13 @@ evalString :: Env -> String -> IO String
 evalString env expr =
     runIOThrows $ fmap show $ (liftThrows $ readExpr expr) >>= eval env
 
-runOne :: [String] -> IO ()
-runOne args = do
+evalFile env filename = eval env (List [Atom "load", String filename])
+
+runFile :: [String] -> IO ()
+runFile args = do
     env <- primitiveBindings >>= flip bindVars [("args", List $ map String $ drop 1 args)]
-    (runIOThrows $ fmap show $ eval env (List [Atom "load", String (args !! 0)]))
-        >>= hPutStrLn stderr
+    (runIOThrows $ fmap show $ evalFile env filename) >>= hPutStrLn stderr
+    where filename = args !! 0
 
 runRepl :: IO ()
 runRepl = primitiveBindings >>= runInputT haskelineSettings . withInterrupt . loop 0
@@ -556,4 +558,4 @@ main :: IO ()
 main = do args <- getArgs
           if null args
              then runRepl >> putStrLn "bye!"
-             else runOne args
+             else runFile args
