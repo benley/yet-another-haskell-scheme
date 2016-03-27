@@ -12,6 +12,8 @@ import System.Environment
 import System.IO
 import Text.ParserCombinators.Parsec hiding (spaces)
 
+import Yahs.Util
+
 data LispError = NumArgs Integer [LispVal]
                | TypeMismatch String LispVal
                | Parser ParseError
@@ -468,27 +470,9 @@ equal badArgList = throwError $ NumArgs 2 badArgList
 
 --------------------- REPL
 
-flushStr :: String -> IO ()
-flushStr str = putStr str >> hFlush stdout
-
-readPrompt :: String -> IO String
-readPrompt prompt = flushStr prompt >> getLine >>= return . strip
-
-strip :: String -> String
-strip = lstrip . rstrip
-
-lstrip :: String -> String
-lstrip str = case str of
-               [] -> []
-               (x:xs) -> if elem x " \t" then lstrip xs else str
-
--- This double-reverse isn't great but stripping whitespace here is a hack
--- to begin with
-rstrip :: String -> String
-rstrip = reverse . lstrip . reverse
-
 evalString :: Env -> String -> IO String
-evalString env expr = runIOThrows $ fmap show $ (liftThrows $ readExpr expr) >>= eval env
+evalString env expr =
+    runIOThrows $ fmap show $ (liftThrows $ readExpr expr) >>= eval env
 
 runOne :: [String] -> IO ()
 runOne args = do
@@ -496,25 +480,23 @@ runOne args = do
     (runIOThrows $ fmap show $ eval env (List [Atom "load", String (args !! 0)]))
         >>= hPutStrLn stderr
 
-haskelineSettings :: Settings IO
-haskelineSettings = defaultSettings {historyFile = Nothing}
-
 runRepl :: IO ()
-runRepl =
-    primitiveBindings >>= runInputT haskelineSettings . withInterrupt . loop 0
-    where
-      loop :: Int -> Env -> InputT IO ()
-      loop n env = do
-        minput <- handle (\Interrupt -> outputStrLn "Interrupted" >> return Nothing)
-                        (getInputLine $ "["++show n++"] Lisp >>> ")
-        case minput of
-          Nothing -> return ()
-          Just i ->
-            case strip i of
-              "quit" -> return ()
-              "(quit)" -> return ()
-              "" -> loop (n+1) env
-              input -> liftIO (evalString env input) >>= outputStrLn >> loop (n+1) env
+runRepl = primitiveBindings >>= runInputT haskelineSettings . withInterrupt . loop 0
+    where haskelineSettings :: Settings IO
+          haskelineSettings = defaultSettings {historyFile = Nothing}
+
+          loop :: Int -> Env -> InputT IO ()
+          loop n env = do
+            minput <- handle (\Interrupt -> outputStrLn "Interrupted" >> return Nothing)
+                            (getInputLine $ "["++show n++"] Lisp >>> ")
+            case minput of
+              Nothing -> return ()
+              Just i ->
+                case strip i of
+                  "quit" -> return ()
+                  "(quit)" -> return ()
+                  "" -> loop (n+1) env
+                  input -> liftIO (evalString env input) >>= outputStrLn >> loop (n+1) env
 
 
 ---------------------- STATE
