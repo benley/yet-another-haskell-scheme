@@ -7,6 +7,7 @@ import Control.Monad
 import Control.Monad.Except
 import Data.IORef
 import Data.Maybe (isJust, isNothing)
+import System.Console.Haskeline
 import System.Environment
 import System.IO
 import Text.ParserCombinators.Parsec hiding (spaces)
@@ -195,6 +196,10 @@ showVal (IOFunc _) = "<IO primitive>"
 
 unwordsList :: [LispVal] -> String
 unwordsList = unwords . map showVal
+
+makeFunc varargs env params body = return $ Func (map showVal params) varargs body env
+makeNormalFunc = makeFunc Nothing
+makeVarArgs = makeFunc . Just . showVal
 
 eval :: Env -> LispVal -> IOThrowsError LispVal
 eval env val@(String _)    = return val
@@ -485,28 +490,31 @@ rstrip = reverse . lstrip . reverse
 evalString :: Env -> String -> IO String
 evalString env expr = runIOThrows $ fmap show $ (liftThrows $ readExpr expr) >>= eval env
 
-evalAndPrint :: Env -> String -> IO ()
-evalAndPrint env expr = evalString env expr >>= putStrLn
-
-until_ :: Monad m => (a -> Bool)  -> m a -> (a -> m ()) -> m ()
-until_ pred prompt action = do
-    result <- prompt
-    unless (pred result) $ action result >> until_ pred prompt action
-
 runOne :: [String] -> IO ()
 runOne args = do
     env <- primitiveBindings >>= flip bindVars [("args", List $ map String $ drop 1 args)]
     (runIOThrows $ fmap show $ eval env (List [Atom "load", String (args !! 0)]))
         >>= hPutStrLn stderr
 
-runRepl :: IO ()
-runRepl = primitiveBindings >>=
-    until_ (flip elem $ ["quit", "(quit)"])
-           (readPrompt "Lisp >>> ") . evalAndPrint
+haskelineSettings :: Settings IO
+haskelineSettings = defaultSettings {historyFile = Nothing}
 
-makeFunc varargs env params body = return $ Func (map showVal params) varargs body env
-makeNormalFunc = makeFunc Nothing
-makeVarArgs = makeFunc . Just . showVal
+runRepl :: IO ()
+runRepl =
+    primitiveBindings >>= runInputT haskelineSettings . withInterrupt . loop 0
+    where
+      loop :: Int -> Env -> InputT IO ()
+      loop n env = do
+        minput <- handle (\Interrupt -> outputStrLn "Interrupted" >> return Nothing)
+                        (getInputLine $ "["++show n++"] Lisp >>> ")
+        case minput of
+          Nothing -> return ()
+          Just i ->
+            case strip i of
+              "quit" -> return ()
+              "(quit)" -> return ()
+              "" -> loop (n+1) env
+              input -> liftIO (evalString env input) >>= outputStrLn >> loop (n+1) env
 
 
 ---------------------- STATE
