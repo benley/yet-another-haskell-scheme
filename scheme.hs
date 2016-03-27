@@ -68,7 +68,7 @@ spaces = skipMany1 space
 parseString :: Parser LispVal
 parseString = do
     char '"'
-    x <- many (noneOf "\"" <|> escapedChar)
+    x <- many (escapedChar <|> noneOf "\"")
     char '"'
     return (String x)
 
@@ -177,7 +177,7 @@ readExprList = readOrThrow (many parseExpr)
 
 
 showVal :: LispVal -> String
-showVal (String contents)      = "\"" ++ contents ++ "\""
+showVal (String contents)      = show contents
 showVal (Atom name)            = name
 showVal (Number contents)      = show contents
 showVal (Bool True)            = "#t"
