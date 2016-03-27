@@ -153,15 +153,19 @@ parseDottedList = do
     optional spaces
     return $ DottedList head tail
 
+parseComment :: Parser ()
+parseComment = many1 (char ';') >> skipMany (noneOf "\n")
+
 parseExpr :: Parser LispVal
 parseExpr = do
+    skipMany parseComment
     x <- (parseChar
          <|> parseString
          <|> parseNumber
          <|> parseQuoted
          <|> parseAtom
          <|> between (char '(') (char ')') (try parseDottedList <|> parseList))
-    optional spaces
+    skipMany (spaces <|> parseComment)
     return x
 
 readOrThrow :: Parser a -> String -> ThrowsError a
@@ -552,4 +556,4 @@ main :: IO ()
 main = do args <- getArgs
           if null args
              then runRepl >> putStrLn "bye!"
-             else runOne $ args
+             else runOne args
