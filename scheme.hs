@@ -114,10 +114,12 @@ bin2dec = foldr (\c s -> s * 2 + c) 0 . reverse . map c2i
           where c2i c = if c == '0' then 0 else 1
 
 decimalNumber :: Parser LispVal
-decimalNumber = (Number . read) <$> many1 digit
+decimalNumber =
+    try $ optional (string "#d") >>
+    (negativeDecimalNumber <|> ((Number . read) <$> many1 digit))
 
-decimalRadixNumber :: Parser LispVal
-decimalRadixNumber = try (string "#d" >> decimalNumber)
+negativeDecimalNumber :: Parser LispVal
+negativeDecimalNumber = try (char '-' >> Number . read . ('-' :) <$> many1 digit)
 
 hexRadixNumber :: Parser LispVal
 hexRadixNumber = do
@@ -133,7 +135,6 @@ octalRadixNumber = do
 
 parseNumber :: Parser LispVal
 parseNumber = decimalNumber
-              <|> decimalRadixNumber
               <|> binaryRadixNumber
               <|> hexRadixNumber
               <|> octalRadixNumber
@@ -331,7 +332,7 @@ readAll [String filename] = fmap List $ load filename
 
 primitives :: [(String, [LispVal] -> ThrowsError LispVal)]
 primitives = [ ("+", numericBinop (+))
-             , ("-", numericBinop (-))
+             , ("-", primSubtract)
              , ("*", numericBinop (*))
              , ("/", numericBinop div)
              , ("mod", numericBinop mod)
@@ -377,6 +378,11 @@ isNumber _          = return $ Bool False
 isChar :: [LispVal] -> ThrowsError LispVal
 isChar [Character _] = return $ Bool True
 isChar _             = return $ Bool False
+
+primSubtract :: [LispVal] -> ThrowsError LispVal
+primSubtract []    = throwError $ NumArgs 2 []
+primSubtract [val] = unpackNum val >>= return . Number . (0 -)
+primSubtract vals  = mapM unpackNum vals >>= return . Number . foldl1 (-)
 
 numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> ThrowsError LispVal
 numericBinop op []            = throwError $ NumArgs 2 []

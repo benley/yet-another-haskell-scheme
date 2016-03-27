@@ -18,9 +18,7 @@
 (define (odd? num)        (= (mod num 2) 1))
 (define (even? num)       (= (mod num 2) 0))
 
-(define (abs num)
-  ; lol I don't have negative number literals yet
-  (if (negative? num) (* num (- 0 1)) num))
+(define (abs num)         (if (negative? num) (* num -1) num))
 
 (define (foldr func end xs)
   (if (null? xs)
