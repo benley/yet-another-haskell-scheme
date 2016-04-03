@@ -64,5 +64,8 @@
   (define res (filter pred xs))
   (if (null? res) #f (car res)))
 
+(define (any?   pred . xs) (apply or  (map pred xs)))
+(define (every? pred . xs) (apply and (map pred xs)))
+
 '()
 ;end
