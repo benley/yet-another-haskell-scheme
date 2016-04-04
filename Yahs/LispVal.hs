@@ -14,7 +14,7 @@ showError (NotFunction message func)    = message ++ ": " ++ show func
 showError (Parser parseErr)             = "Parse error at " ++ show parseErr
 showError (NumArgs expected found)      =
             "Expected " ++ show expected
-            ++ (if expected==1 then "args;" else "arg;")
+            ++ (if expected==1 then " arg;" else " args;")
             ++ " found values " ++ unwordsList found
 showError (TypeMismatch expected found) =
             "Invalid type: expected " ++ expected

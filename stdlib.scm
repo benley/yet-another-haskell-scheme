@@ -67,5 +67,12 @@
 (define (any?   pred . xs) (apply or  (map pred xs)))
 (define (every? pred . xs) (apply and (map pred xs)))
 
+(define (newline . port)
+  (if (null? port)
+    (display #\newline)
+    (if (> (length port) 1)
+      (display #\newline port) ; this should raise an error
+      (display #\newline (car port)))))
+
 '()
 ;end

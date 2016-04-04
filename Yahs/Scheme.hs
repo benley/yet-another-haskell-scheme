@@ -131,6 +131,8 @@ applyProc (func : args)     = apply func args
 
 makePort :: IOMode -> [LispVal] -> IOThrowsError LispVal
 makePort mode [String filename] = fmap Port $ liftIO $ openFile filename mode
+makePort _ [badarg]             = throwError $ TypeMismatch "string" badarg
+makePort _ badargs              = throwError $ NumArgs 1 badargs
 
 -- http://www.schemers.org/Documents/Standards/R5RS/HTML/r5rs-Z-H-9.html#%_sec_6.6.1
 closePort :: [LispVal] -> IOThrowsError LispVal
