@@ -110,6 +110,7 @@ ioPrimitives = [ ("apply", applyProc)
                , ("close-output-port", closePort)
                , ("read", readProc)
                , ("read-char", readCharProc)
+               , ("peek-char", peekCharProc)
                , ("write", writeProc)
                , ("display", displayProc)
                , ("read-contents", readContents)
@@ -147,6 +148,10 @@ readProc badargs     = throwError $ Default ("Expected 0 or 1 args; found values
 readCharProc :: [LispVal] -> IOThrowsError LispVal
 readCharProc []          = readCharProc [Port stdin]
 readCharProc [Port port] = liftIO (hGetChar port) >>= liftThrows . readChar
+
+peekCharProc :: [LispVal] -> IOThrowsError LispVal
+peekCharProc []          = peekCharProc [Port stdin]
+peekCharProc [Port port] = liftIO (hLookAhead port) >>= liftThrows . readChar
 
 -- http://www.schemers.org/Documents/Standards/R5RS/HTML/r5rs-Z-H-9.html#%_sec_6.6.3
 writeProc :: [LispVal] -> IOThrowsError LispVal
