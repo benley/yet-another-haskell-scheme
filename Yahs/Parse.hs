@@ -5,6 +5,11 @@ import Text.ParserCombinators.Parsec hiding (spaces)
 
 import Yahs.LispVal
 
+readChar :: Char -> ThrowsError LispVal
+readChar c = case parse (namedCharacter <|> anyChar) "" [c] of
+               Left  err -> throwError $ Parser err
+               Right val -> return (Character val)
+
 readExpr :: String -> ThrowsError LispVal
 readExpr = readOrThrow parseExpr
 

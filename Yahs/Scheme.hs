@@ -109,6 +109,7 @@ ioPrimitives = [ ("apply", applyProc)
                , ("close-input-port", closePort)
                , ("close-output-port", closePort)
                , ("read", readProc)
+               , ("read-char", readCharProc)
                , ("write", writeProc)
                , ("display", displayProc)
                , ("read-contents", readContents)
@@ -140,9 +141,12 @@ readProc :: [LispVal] -> IOThrowsError LispVal
 readProc []          = readProc [Port stdin]
 readProc [Port port] = liftIO (hGetLine port) >>= liftThrows . readExpr
 readProc [badArg]    = throwError $ TypeMismatch "port" badArg
-readProc badargs     =
-    throwError $ Default ("Expected 0 or 1 args; found values "
-                          ++ unwordsList badargs)
+readProc badargs     = throwError $ Default ("Expected 0 or 1 args; found values "
+                                             ++ unwordsList badargs)
+
+readCharProc :: [LispVal] -> IOThrowsError LispVal
+readCharProc []          = readCharProc [Port stdin]
+readCharProc [Port port] = liftIO (hGetChar port) >>= liftThrows . readChar
 
 -- http://www.schemers.org/Documents/Standards/R5RS/HTML/r5rs-Z-H-9.html#%_sec_6.6.3
 writeProc :: [LispVal] -> IOThrowsError LispVal
