@@ -188,7 +188,10 @@ showVal (Bool True)            = "#t"
 showVal (Bool False)           = "#f"
 showVal (List contents)        = "(" ++ unwordsList contents ++ ")"
 showVal (DottedList head tail) = "(" ++ unwordsList head ++ " . " ++ showVal tail ++ ")"
-showVal (Character c)          = "#\\" ++ [c]
+showVal (Character c)          = "#\\" ++ case c of
+                                            ' '  -> "space"
+                                            '\n' -> "newline"
+                                            x    -> [c]
 showVal (PrimitiveFunc _)      = "<primitive>"
 showVal (Port _)               = "<IO port>"
 showVal (IOFunc _)             = "<IO primitive>"
@@ -199,7 +202,6 @@ showVal Func {params = args, vararg = varargs, body = body, closure = env} =
                                    Just arg -> " . "  ++ arg)
                           ++ ") " ++ unwords (showVal <$> body)
                           ++ ")"
-
 
 unwordsList :: [LispVal] -> String
 unwordsList = unwords . map showVal
@@ -290,6 +292,7 @@ ioPrimitives = [ ("apply", applyProc)
                , ("close-output-port", closePort)
                , ("read", readProc)
                , ("write", writeProc)
+               , ("display", displayProc)
                , ("read-contents", readContents)
                , ("read-all", readAll)
                ]
@@ -309,17 +312,38 @@ applyProc (func : args)     = apply func args
 makePort :: IOMode -> [LispVal] -> IOThrowsError LispVal
 makePort mode [String filename] = fmap Port $ liftIO $ openFile filename mode
 
+-- http://www.schemers.org/Documents/Standards/R5RS/HTML/r5rs-Z-H-9.html#%_sec_6.6.1
 closePort :: [LispVal] -> IOThrowsError LispVal
 closePort [Port port] = liftIO (hClose port) >> return (Bool True)
 closePort _           = return (Bool False)
 
+-- http://www.schemers.org/Documents/Standards/R5RS/HTML/r5rs-Z-H-9.html#%_sec_6.6.2
 readProc :: [LispVal] -> IOThrowsError LispVal
 readProc []          = readProc [Port stdin]
 readProc [Port port] = liftIO (hGetLine port) >>= liftThrows . readExpr
 
+-- http://www.schemers.org/Documents/Standards/R5RS/HTML/r5rs-Z-H-9.html#%_sec_6.6.3
 writeProc :: [LispVal] -> IOThrowsError LispVal
 writeProc [obj]            = writeProc [obj, Port stdout]
 writeProc [obj, Port port] = liftIO (hPrint port obj) >> return (Bool True)
+
+-- http://www.schemers.org/Documents/Standards/R5RS/HTML/r5rs-Z-H-9.html#%_sec_6.6.3
+displayProc :: [LispVal] -> IOThrowsError LispVal
+
+displayProc [] = throwError $ NumArgs 2 []
+
+displayProc [obj] = displayProc [obj, Port stdout]
+
+displayProc [obj, Port port] =
+    liftIO (hPutStr port (toStr obj)) >> return (Bool True)
+    where
+      toStr :: LispVal -> String
+      toStr (String x)    = x
+      toStr (Character x) = [x]
+      toStr x             = showVal x
+
+displayProc tooManyArgs = throwError $ NumArgs 2 tooManyArgs
+
 
 readContents :: [LispVal] -> IOThrowsError LispVal
 readContents [String filename] = fmap String $ liftIO $ readFile filename
@@ -401,7 +425,7 @@ unpackNum notNum     = throwError $ TypeMismatch "number" notNum
 boolBinop :: (LispVal -> ThrowsError a) -> (a -> a -> Bool) -> [LispVal] -> ThrowsError LispVal
 boolBinop unpacker op args = if length args /= 2
                              then throwError $ NumArgs 2 args
-                             else do left <- unpacker $ args !! 0
+                             else do left  <- unpacker $ args !! 0
                                      right <- unpacker $ args !! 1
                                      return $ Bool $ left `op` right
 
@@ -470,8 +494,10 @@ unpackEquals arg1 arg2 (AnyUnpacker unpacker) =
 
 equal :: [LispVal] -> ThrowsError LispVal
 equal [arg1, arg2] =
-    do primitiveEquals <- fmap or $ mapM (unpackEquals arg1 arg2)
-                         [AnyUnpacker unpackNum, AnyUnpacker unpackStr, AnyUnpacker unpackBool]
+    do primitiveEquals <- fmap or (mapM (unpackEquals arg1 arg2)
+                                        [AnyUnpacker unpackNum,
+                                         AnyUnpacker unpackStr,
+                                         AnyUnpacker unpackBool])
        eqvEquals <- eqv [arg1, arg2]
        return $ Bool (primitiveEquals || let (Bool x) = eqvEquals in x)
 
@@ -500,15 +526,15 @@ runRepl = primitiveBindings >>= runInputT haskelineSettings . withInterrupt . lo
           loop :: Int -> Env -> InputT IO ()
           loop n env = do
             minput <- handle (\Interrupt -> outputStrLn "Interrupted" >> return Nothing)
-                            (getInputLine $ "["++show n++"] Lisp >>> ")
+                             (getInputLine $ "["++show n++"] Lisp >>> ")
             case minput of
               Nothing -> return ()
-              Just i ->
+              Just i  ->
                 case strip i of
-                  "quit" -> return ()
+                  "quit"   -> return ()
                   "(quit)" -> return ()
-                  "" -> loop (n+1) env
-                  input -> liftIO (evalString env input) >>= outputStrLn >> loop (n+1) env
+                  ""       -> loop (n+1) env
+                  input    -> liftIO (evalString env input) >>= outputStrLn >> loop (n+1) env
 
 
 ---------------------- STATE
@@ -555,7 +581,8 @@ defineVar envRef var value =
                return value
 
 bindVars :: Env -> [(String, LispVal)] -> IO Env
-bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
+bindVars envRef bindings =
+    readIORef envRef >>= extendEnv bindings >>= newIORef
     where extendEnv bindings env = fmap (++ env) (mapM addBinding bindings)
           addBinding (var, value) = do ref <- newIORef value
                                        return (var, ref)
