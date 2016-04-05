@@ -10,6 +10,7 @@ let ghc = haskell.packages.${compiler}.ghcWithPackages (x: with x; [
   hdevtools
   hlint
   hoogle
+  file-embed
 ]);
 
 in stdenv.mkDerivation rec {

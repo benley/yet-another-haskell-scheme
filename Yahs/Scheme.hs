@@ -1,7 +1,11 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Yahs.Scheme where
 
 import Control.Monad
 import Control.Monad.Except
+import qualified Data.ByteString.Char8 as Char8
+import Data.FileEmbed (embedFile)
 import Data.IORef
 import Data.Maybe (isJust, isNothing)
 import System.Console.Haskeline
@@ -91,7 +95,7 @@ apply (Func params varargs body closure) args =
                 >>= evalBody
       where remainingArgs = drop (length params) args
             num = toInteger . length
-            evalBody env = fmap last $ mapM (eval env) body
+            evalBody env = last <$> mapM (eval env) body
             bindVarArgs arg env =
               case arg of
                 Just argName -> liftIO $ bindVars env [(argName, List remainingArgs)]
@@ -157,7 +161,7 @@ peekCharProc [Port port] = liftIO (hLookAhead port) >>= liftThrows . readChar
 
 -- http://www.schemers.org/Documents/Standards/R5RS/HTML/r5rs-Z-H-9.html#%_sec_6.6.3
 writeProc :: [LispVal] -> IOThrowsError LispVal
-writeProc []               = throwError $ Default ("Expected 1 or 2 args; got 0")
+writeProc []               = throwError $ Default "Expected 1 or 2 args; got 0"
 writeProc [obj]            = writeProc [obj, Port stdout]
 writeProc [obj, Port port] = liftIO (hPrint port obj) >> return (Bool True)
 writeProc [_, badarg]      = throwError $ TypeMismatch "port" badarg
@@ -177,9 +181,11 @@ displayProc [obj, Port port] =
       toStr x             = show x
 displayProc tooManyArgs      = throwError $ NumArgs 2 tooManyArgs
 
-
+-- is this even part of R5RS?
 readContents :: [LispVal] -> IOThrowsError LispVal
 readContents [String filename] = fmap String $ liftIO $ readFile filename
+readContents [badArg]          = throwError $ TypeMismatch "string" badArg
+readContents badArgs           = throwError $ NumArgs 1 badArgs
 
 load :: String -> IOThrowsError [LispVal]
 load filename = liftIO (readFile filename) >>= liftThrows . readExprList
@@ -187,22 +193,41 @@ load filename = liftIO (readFile filename) >>= liftThrows . readExprList
 readAll :: [LispVal] -> IOThrowsError LispVal
 readAll [String filename] = List <$> load filename
 
---------------------- REPL
+-- stdlib, embedded via TemplateHaskell
+embeddedStdlib = Char8.unpack $(embedFile "stdlib.scm")
 
-evalString :: Env -> String -> IO String
-evalString env expr =
-    runIOThrows $ fmap show $ liftThrows (readExpr expr) >>= eval env
+-- if scheme had a (load-string "stuff") it would use this
+loadStr :: String -> IOThrowsError [LispVal]
+loadStr expr = liftThrows $ readExprList expr
 
+-- Eval a string containing multiple forms. Returns the result of the last one.
+evalStrMulti :: Env -> String -> IOThrowsError LispVal
+evalStrMulti env expr = loadStr expr >>= fmap last . mapM (eval env)
+
+evalFile :: Env -> String -> IOThrowsError LispVal
 evalFile env filename = eval env (List [Atom "load", String filename])
 
 runFile :: [String] -> IO ()
 runFile args = do
     env <- primitiveBindings >>= flip bindVars [("args", List $ map String $ drop 1 args)]
-    runIOThrows (show <$> evalFile env filename) >>= hPutStrLn stderr
-    where filename = args !! 0
+    runIOThrows (fmap show $ evalStrMulti env embeddedStdlib >>
+                             evalFile env filename) >>= hPutStrLn stderr
+    where filename = head args
+
+--------------------- REPL
+
+evalString :: Env -> String -> IO String
+evalString env expr = runIOThrows $ fmap show $ liftThrows (readExpr expr) >>= eval env
 
 runRepl :: IO ()
-runRepl = primitiveBindings >>= runInputT haskelineSettings . withInterrupt . loop 0
+runRepl = do
+    env <- primitiveBindings
+
+    -- Load the embedded stdlib
+    runIOThrows (show <$> evalStrMulti env embeddedStdlib)
+
+    runInputT haskelineSettings $ withInterrupt $ loop 0 env
+
     where haskelineSettings :: Settings IO
           haskelineSettings = defaultSettings {historyFile = Nothing}
 
@@ -225,16 +250,15 @@ runRepl = primitiveBindings >>= runInputT haskelineSettings . withInterrupt . lo
 nullEnv :: IO Env
 nullEnv = newIORef[]
 
-
 liftThrows :: ThrowsError a -> IOThrowsError a
 liftThrows (Left  err) = throwError err
 liftThrows (Right val) = return val
 
 runIOThrows :: IOThrowsError String -> IO String
-runIOThrows action = runExceptT (trapError action) >>= return . extractValue
+runIOThrows action = extractValue <$> runExceptT (trapError action)
 
 isBound :: Env -> String -> IO Bool
-isBound envRef var = readIORef envRef >>= return . isJust . lookup var
+isBound envRef var = (isJust . lookup var) <$> readIORef envRef
 
 getVar :: Env -> String -> IOThrowsError LispVal
 getVar envRef var = do env <- liftIO $ readIORef envRef
