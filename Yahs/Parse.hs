@@ -132,11 +132,10 @@ parseAtom = do
                _    -> Atom atom
 
 parseList :: Parser LispVal
-parseList = optional spaces >> List <$> many parseExpr
+parseList = List <$> many parseExpr
 
 parseDottedList :: Parser LispVal
 parseDottedList = do
-    head <- optional spaces >> many parseExpr
+    head <- many parseExpr
     tail <- char '.' >> spaces >> parseExpr
-    optional spaces
     return $ DottedList head tail
