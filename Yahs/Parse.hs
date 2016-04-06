@@ -1,6 +1,6 @@
 module Yahs.Parse where
 
-import Control.Monad.Except (throwError)
+import Control.Monad.Except (throwError, void)
 import Text.ParserCombinators.Parsec hiding (spaces)
 
 import Yahs.LispVal
@@ -15,6 +15,14 @@ readExpr = readOrThrow parseExpr
 
 readExprList :: String -> ThrowsError [LispVal]
 readExprList = readOrThrow (many parseExpr)
+
+-- Read multiple expressions from a string that may start
+-- with a shebang line
+readExprFile :: String -> ThrowsError [LispVal]
+readExprFile = readOrThrow (optional parseShebangLine >> many parseExpr)
+
+parseShebangLine :: Parser ()
+parseShebangLine = void $ try (string "#!" >> many (noneOf "\n"))
 
 readOrThrow :: Parser a -> String -> ThrowsError a
 readOrThrow parser input = case parse parser "lisp" input of
@@ -31,7 +39,7 @@ symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
 
 parseExpr :: Parser LispVal
 parseExpr = do
-    skipMany parseComment
+    skipMany (spaces <|> parseComment)
     x <- parseChar
          <|> parseString
          <|> parseNumber
@@ -45,7 +53,7 @@ parseComment :: Parser ()
 parseComment = many1 (char ';') >> skipMany (noneOf "\n")
 
 parseChar :: Parser LispVal
-parseChar = try (string "#\\" >> (namedCharacter <|> anyChar)) >>= return . Character
+parseChar = Character <$> try (string "#\\" >> (namedCharacter <|> anyChar))
 
 namedCharacter :: Parser Char
 namedCharacter = do

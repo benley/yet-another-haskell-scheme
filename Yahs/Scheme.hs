@@ -188,12 +188,13 @@ readContents [badArg]          = throwError $ TypeMismatch "string" badArg
 readContents badArgs           = throwError $ NumArgs 1 badArgs
 
 load :: String -> IOThrowsError [LispVal]
-load filename = liftIO (readFile filename) >>= liftThrows . readExprList
+load filename = liftIO (readFile filename) >>= liftThrows . readExprFile
 
 readAll :: [LispVal] -> IOThrowsError LispVal
 readAll [String filename] = List <$> load filename
 
 -- stdlib, embedded via TemplateHaskell
+embeddedStdlib :: String
 embeddedStdlib = Char8.unpack $(embedFile "stdlib.scm")
 
 -- if scheme had a (load-string "stuff") it would use this
@@ -208,11 +209,11 @@ evalFile :: Env -> String -> IOThrowsError LispVal
 evalFile env filename = eval env (List [Atom "load", String filename])
 
 runFile :: [String] -> IO ()
-runFile args = do
-    env <- primitiveBindings >>= flip bindVars [("args", List $ map String $ drop 1 args)]
-    runIOThrows (fmap show $ evalStrMulti env embeddedStdlib >>
-                             evalFile env filename) >>= hPutStrLn stderr
-    where filename = head args
+runFile (filename:args) = do
+    env <- primitiveBindings >>= flip bindVars [("args", List $ map String args)]
+    runIOThrows
+        (show <$> (evalStrMulti env embeddedStdlib >> evalFile env filename))
+        >>= hPutStrLn stderr
 
 --------------------- REPL
 
