@@ -40,9 +40,9 @@ symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
 parseExpr :: Parser LispVal
 parseExpr = do
     skipMany (spaces <|> parseComment)
-    x <- parseChar
+    x <- parseHash
          <|> parseString
-         <|> parseNumber
+         <|> decimalNumber
          <|> parseQuoted
          <|> parseAtom
          <|> between (char '(') (char ')') (try parseDottedList <|> parseList)
@@ -51,16 +51,6 @@ parseExpr = do
 
 parseComment :: Parser ()
 parseComment = many1 (char ';') >> skipMany (noneOf "\n")
-
-parseChar :: Parser LispVal
-parseChar = Character <$> try (string "#\\" >> (namedCharacter <|> anyChar))
-
-namedCharacter :: Parser Char
-namedCharacter = do
-    x <- string "space" <|> string "newline"
-    return $ case x of
-               "space"   -> ' '
-               "newline" -> '\n'
 
 parseString :: Parser LispVal
 parseString = do
@@ -80,39 +70,53 @@ escapedChar = do
                '\\' -> '\\'
                '"'  -> '"'
 
-parseNumber :: Parser LispVal
-parseNumber = decimalNumber
-              <|> binaryRadixNumber
-              <|> hexRadixNumber
-              <|> octalRadixNumber
+parseHash :: Parser LispVal
+parseHash = do
+    char '#'
+    x <- oneOf "\\bdfotx"
+    case x of
+      '\\' -> Character <$> (namedCharacter <|> anyChar)
+      'b'  -> binaryNumber
+      'd'  -> decimalNumber
+      -- 'e'  -> exactNumber
+      'f'  -> return (Bool False)
+      -- 'i'  -> inexactNumber
+      'o'  -> octalNumber
+      't'  -> return (Bool True)
+      'x'  -> hexNumber
 
-binaryRadixNumber :: Parser LispVal
-binaryRadixNumber = do
-    num <- try (string "#b" >> many1 (oneOf "01"))
+namedCharacter :: Parser Char
+namedCharacter = do
+    x <- string "space" <|> string "newline"
+    return $ case x of
+               "space"   -> ' '
+               "newline" -> '\n'
+
+binaryNumber :: Parser LispVal
+binaryNumber = do
+    num <- many1 (oneOf "01")
     notFollowedBy digit
     return $ Number (bin2dec num)
-
-bin2dec :: String -> Integer
-bin2dec = foldr (\c s -> s * 2 + c) 0 . reverse . map c2i
-          where c2i c = if c == '0' then 0 else 1
+    where
+      bin2dec :: String -> Integer
+      bin2dec = foldr (\c s -> s * 2 + c) 0 . reverse . map c2i
+                where c2i c = if c == '0' then 0 else 1
 
 decimalNumber :: Parser LispVal
-decimalNumber =
-    try $ optional (string "#d") >>
-    (negativeDecimalNumber <|> ((Number . read) <$> many1 digit))
+decimalNumber = try negativeDecimalNumber <|> ((Number . read) <$> many1 digit)
 
 negativeDecimalNumber :: Parser LispVal
-negativeDecimalNumber = try (char '-' >> Number . read . ('-' :) <$> many1 digit)
+negativeDecimalNumber = char '-' >> Number . read . ('-' :) <$> many1 digit
 
-hexRadixNumber :: Parser LispVal
-hexRadixNumber = do
-    num <- try (string "#x" >> many1 hexDigit)
+hexNumber :: Parser LispVal
+hexNumber = do
+    num <- many1 hexDigit
     notFollowedBy letter
     return $ Number $ read $ "0x" ++ num
 
-octalRadixNumber :: Parser LispVal
-octalRadixNumber = do
-    num <- try (string "#o" >> many1 octDigit)
+octalNumber :: Parser LispVal
+octalNumber = do
+    num <- many1 octDigit
     notFollowedBy digit
     return $ Number $ read $ "0o" ++ num
 
@@ -126,10 +130,7 @@ parseAtom = do
     first <- letter <|> symbol
     rest  <- many (letter <|> digit <|> symbol)
     let atom = first:rest
-    return $ case atom of
-               "#t" -> Bool True
-               "#f" -> Bool False
-               _    -> Atom atom
+    return $ Atom atom
 
 parseList :: Parser LispVal
 parseList = List <$> many parseExpr
